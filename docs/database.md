@@ -2,7 +2,7 @@
 
 PostgreSQLを前提としたデータベース設計書です。型はPostgreSQLの表記で書いていますが、使用するORM(Prisma / JPA / SQLAlchemy / Eloquent / GORM / Active Record)のマイグレーション機能で同等の定義を作成してください。
 
-- 主キーはすべて `BIGSERIAL`(自動採番)です。ただし `staff_profiles` はusersと1対1のため `user_id` を主キーにします。
+- 主キーはすべて `BIGSERIAL`(自動採番)です。ただし `staff_profiles` はusersと1対1のため `user_id` を主キーに、中間テーブル(`staff_menus`、`reservation_menus`)は複合主キーにします。
 - 日時は `TIMESTAMPTZ`(UTC保存)、営業時間・シフトの時刻は `TIME`(JSTの壁時計時刻)、日付は `DATE` を使います。
 - 文字列ステータス(`role`、`status`、`type` など)はCHECK制約付きの `VARCHAR` とします(ネイティブENUMでも構いませんが、値は本書と完全一致させること)。
 
