@@ -1,0 +1,272 @@
+{
+  "labels": [
+    {
+      "name": "feature",
+      "color": "2da44e",
+      "description": "機能実装"
+    },
+    {
+      "name": "chore",
+      "color": "6e7781",
+      "description": "環境構築・設定・開発体験"
+    },
+    {
+      "name": "docs",
+      "color": "0969da",
+      "description": "ドキュメント"
+    },
+    {
+      "name": "test",
+      "color": "d4a72c",
+      "description": "テストが主眼のissue"
+    },
+    {
+      "name": "advanced",
+      "color": "8250df",
+      "description": "発展課題(任意)"
+    }
+  ],
+  "milestones": [
+    {
+      "title": "M1: 認証と管理基盤",
+      "description": "動く土台を作る: 環境構築、DBスキーマ、認証(サインアップ/ログイン/招待)、メニュー管理、スタッフ管理"
+    },
+    {
+      "title": "M2: シフトと空き枠",
+      "description": "ドメインの心臓部: 営業時間、シフトパターン・例外、空き枠計算APIと検索UI"
+    },
+    {
+      "title": "M3: 予約コア",
+      "description": "トランザクションと権限: 予約作成(二重予約防止)、予約フローUI、マイページ、変更・キャンセル、予約ボード"
+    },
+    {
+      "title": "M4: 運用と仕上げ",
+      "description": "実務の周辺: 顧客管理・カルテ、売上サマリ、リマインダーメール、CI、README整備"
+    }
+  ],
+  "issues": [
+    {
+      "title": "M1-01: 開発環境とdocker composeを整える",
+      "body": "## 概要\n\n選択したスタックのプロジェクト雛形と、PostgreSQL + MailHogのdocker compose環境を作り、以後のすべてのissueの土台を整えます。\n\n## 仕様参照\n\n- [docs/infra.md](../blob/main/docs/infra.md) — 「ローカル開発構成」\n- [docs/development-flow.md](../blob/main/docs/development-flow.md) — ブランチ規約とPRの型(このissueから適用します)\n\n## タスク\n\n- [ ] バックエンド・フロントエンド(React + Vite + TypeScript推奨)のプロジェクト雛形を作成する\n- [ ] `docker-compose.yml` にPostgreSQL 16とMailHogを定義する(ポートはinfra.mdの表どおり)\n- [ ] `.env.example` を作成し、`.env` をgitignoreする\n- [ ] ヘルスチェックAPI `GET /api/health` を実装する\n- [ ] 起動手順(compose → API → フロント)を自分のリポジトリのREADMEに書く\n\n## 受入条件\n\n- [ ] `docker compose up -d` の後、`lumina_reserve` データベースにpsql等で接続できる\n- [ ] `http://localhost:8025` でMailHogのWeb UIが開ける\n- [ ] `GET /api/health` が200を返す\n- [ ] フロントの開発サーバーからAPIへ `credentials: \"include\"` 付きfetchが通る(CORS設定済み)\n\n## ヒント\n\nCORSとCookieの設定(credentials許可、originの固定)はここで済ませておくと、M1-04の認証実装で悩みません。\n\n> AIへの依頼例: 「docs/infra.mdの『ローカル開発構成』どおりに、PostgreSQL 16とMailHogのdocker-compose.ymlと.env.exampleを作ってください」\n",
+      "labels": [
+        "chore"
+      ],
+      "milestone": "M1: 認証と管理基盤"
+    },
+    {
+      "title": "M1-02: DBスキーマをmigrationで初期化しシードを投入する",
+      "body": "## 概要\n\nDB設計書の全12テーブルをmigrationとして定義し、初期admin・営業時間・動作確認用メニューのシードを投入します。\n\n## 仕様参照\n\n- [docs/database.md](../blob/main/docs/database.md) — 全テーブル定義表、「インデックスと一意制約の方針」「シードデータ」\n\n## タスク\n\n- [ ] 12テーブルすべてをmigrationで定義する(カラム名・型・NULL・デフォルト・CHECK制約を定義表と一致させる)\n- [ ] UNIQUE制約とインデックス(特に `reservations (staff_id, start_at)`)を作成する\n- [ ] シード: 初期adminユーザー、business_hours 7行(月曜定休)、メニュー5件を投入する\n- [ ] migrationとシードの実行コマンドをREADMEに書く\n\n## 受入条件\n\n- [ ] まっさらなDBに対してmigrationが一発ですべて通る\n- [ ] `users.email` への重複INSERTがUNIQUE制約でエラーになる(テストまたはSQLで確認)\n- [ ] シード後、business_hoursが7行あり、月曜(weekday=1)だけ `is_closed = true` になっている\n- [ ] `reservations` に `(staff_id, start_at)` のインデックスが存在する\n\n## ヒント\n\nstatus・role・typeの文字列値はdocsと完全一致させてください。ORMのenum機能を使う場合はDBに入る文字列表現を必ず確認します。\n\n> AIへの依頼例: 「docs/database.mdのテーブル定義表と完全に一致するmigrationを書いてください。CHECK制約・UNIQUE・インデックスも漏れなく。終わったら定義表と突合した差分レポートをください」\n",
+      "labels": [
+        "chore"
+      ],
+      "milestone": "M1: 認証と管理基盤"
+    },
+    {
+      "title": "M1-03: 顧客サインアップとメール確認を実装する",
+      "body": "## 概要\n\ncustomerのサインアップと、確認メールのリンクによるメール確認(本登録)を実装します。メール未確認のユーザーはログインできません。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-1. 認証」\n- [docs/api.md](../blob/main/docs/api.md) — 「認証(/api/auth)」「エラーフォーマット」\n- [docs/database.md](../blob/main/docs/database.md) — email_verification_tokens\n- [docs/screens.md](../blob/main/docs/screens.md) — C-02、C-03\n\n## タスク\n\n- [ ] `POST /api/auth/signup` を実装する(email重複は `409 EMAIL_TAKEN`、パスワード8文字未満は `400 VALIDATION_ERROR`)\n- [ ] 確認トークン(有効期限24時間)を発行し、確認メールをMailHogへ送信する\n- [ ] `GET /api/auth/verify-email?token=...` を実装する(不正・期限切れ・使用済みは `400 TOKEN_INVALID`)\n- [ ] 画面C-02(サインアップ)とC-03(メール確認)を実装する\n- [ ] テスト: 正常系、email重複、無効トークンの3系統\n\n## 受入条件\n\n- [ ] サインアップするとMailHog(`http://localhost:8025`)に確認メールが届き、リンクを開くと `email_verified_at` が設定される\n- [ ] 使用済みトークン・期限切れトークンが `400 TOKEN_INVALID` になる(テストあり)\n- [ ] DBのパスワードがハッシュで保存されており、平文が存在しない(テストで確認)\n\n## ヒント\n\nメール送信処理は最初から1モジュールに集約してください。M1-05(招待)、M4-03(リマインダー)、本番のSES切替のすべてで再利用します。\n\n> AIへの依頼例: 「docs/api.mdのエラーフォーマット({\"message\", \"code\"})に従ってsignupとverify-emailを実装し、期限切れ・使用済みトークンのテストも書いてください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M1: 認証と管理基盤"
+    },
+    {
+      "title": "M1-04: ログイン・ログアウト・meを実装する",
+      "body": "## 概要\n\nCookie + JWT方式のログイン・ログアウトと、ログイン中ユーザーを返す `me` を実装します。以後のすべての要認証APIが使う認証ミドルウェアもここで作ります。\n\n## 仕様参照\n\n- [docs/api.md](../blob/main/docs/api.md) — 「認証方式」(Cookie属性の表)、「認証(/api/auth)」\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-1. 認証」\n- [docs/screens.md](../blob/main/docs/screens.md) — C-04\n\n## タスク\n\n- [ ] `POST /api/auth/login` を実装する(不一致は `401 INVALID_CREDENTIALS`、メール未確認は `403 EMAIL_NOT_VERIFIED`)\n- [ ] JWTを `lumina_session` Cookie(HttpOnly、SameSite=Lax、7日)で発行する\n- [ ] `POST /api/auth/logout` と `GET /api/auth/me` を実装する\n- [ ] 認証ミドルウェア(Cookie検証 → DBからユーザー取得)を実装する\n- [ ] 画面C-04と、フロントの認証状態管理(ログイン後のロール別リダイレクト)を実装する\n\n## 受入条件\n\n- [ ] ログイン成功で `lumina_session` Cookieが発行され、ページをリロードしても `GET /api/auth/me` が200を返す\n- [ ] メール未確認ユーザーのログインが `403 EMAIL_NOT_VERIFIED` になる(テストあり)\n- [ ] ログアウト後の `GET /api/auth/me` が `401 UNAUTHENTICATED` になる(テストあり)\n- [ ] シードの初期adminでログインできる\n\n## ヒント\n\nロール判定はJWTの中身ではなく、リクエストごとにDBから引いたユーザーの `role` を正としてください(docs/api.md「認証方式」参照)。\n\n> AIへの依頼例: 「docs/api.mdの『認証方式』の表どおりのCookie属性でJWTログインを実装してください。SNSカリキュラムのsns_session方式と同じ構成です」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M1: 認証と管理基盤"
+    },
+    {
+      "title": "M1-05: 招待制のstaff・admin登録を実装する",
+      "body": "## 概要\n\nadminが招待を発行し、招待メールのリンクからstaff・adminが登録できるようにします。一般公開のサインアップではcustomerしか作れないことがポイントです。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-1. 認証」(招待の有効期限72時間)\n- [docs/api.md](../blob/main/docs/api.md) — 「招待(/api/invitations)」\n- [docs/database.md](../blob/main/docs/database.md) — staff_invitations、staff_profiles\n- [docs/screens.md](../blob/main/docs/screens.md) — A-01\n\n## タスク\n\n- [ ] `POST /api/invitations`(admin限定)と `GET /api/invitations` を実装し、招待メールを送信する\n- [ ] `POST /api/invitations/accept` を実装する(トークン検証 → ユーザー作成 → `used_at` 記録)\n- [ ] `role = staff` の登録時に `staff_profiles` を自動作成する(`active = false`、display_name初期値は名前)\n- [ ] 画面A-01(招待受諾)と、A-05内の招待発行フォームを実装する\n- [ ] テスト: ロール制御と期限切れトークン\n\n## 受入条件\n\n- [ ] adminが招待を発行するとMailHogにリンク付きメールが届き、リンクから登録したユーザーがstaffとしてログインできる\n- [ ] 招待経由のユーザーは `email_verified_at` が登録時に設定されている(テストあり)\n- [ ] customer・staffによる `POST /api/invitations` が `403 FORBIDDEN` になる(テストあり)\n- [ ] 使用済み・期限切れの招待トークンが `400 TOKEN_INVALID` になる(テストあり)\n\n## ヒント\n\nトークン発行・検証のロジックはM1-03のメール確認トークンとほぼ同型です。共通化できないか検討してみてください(ただし別テーブルです)。\n\n> AIへの依頼例: 「M1-03のメール確認トークンの実装を参考に、staff_invitationsテーブルで招待フローを実装してください。docs/api.mdの『招待』の3エンドポイントに準拠して」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M1: 認証と管理基盤"
+    },
+    {
+      "title": "M1-06: メニューCRUDを実装する",
+      "body": "## 概要\n\nadminによるメニュー管理と、顧客向けの公開メニュー一覧を実装します。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-2. メニュー管理(admin)」\n- [docs/api.md](../blob/main/docs/api.md) — 「メニュー(/api/menus)」\n- [docs/screens.md](../blob/main/docs/screens.md) — A-04\n\n## タスク\n\n- [ ] `GET /api/menus` を実装する(activeのみ・sort_order昇順。admin/staffは `?include_inactive=true` 可)\n- [ ] `POST /api/menus`、`PATCH /api/menus/:id`、`DELETE /api/menus/:id`(すべてadmin限定)を実装する\n- [ ] 予約実績(reservation_menusに行)があるメニューの削除を `409 MENU_IN_USE` で拒否する\n- [ ] 画面A-04(一覧・作成・編集・無効化・並び順)を実装する\n- [ ] テスト: 認可と公開一覧のフィルタ\n\n## 受入条件\n\n- [ ] adminがメニューを作成・編集・無効化でき、公開一覧はactiveのみsort_order昇順で返る(テストあり)\n- [ ] customerによる `POST /api/menus` が `403 FORBIDDEN`、未ログインは `401 UNAUTHENTICATED`(テストあり)\n- [ ] reservation_menusに行があるメニューのDELETEが `409 MENU_IN_USE` になる(テストあり。予約APIは未実装なのでテストデータを直接INSERTして検証)\n\n## ヒント\n\n`include_inactive=true` を未ログイン・customerが付けた場合は無視してactiveのみ返す(403にしない)のがシンプルです。\n\n> AIへの依頼例: 「docs/api.mdの『メニュー』の4エンドポイントを実装してください。ロール別の権限マトリクスのテストも一緒に」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M1: 認証と管理基盤"
+    },
+    {
+      "title": "M1-07: スタッフ管理と対応メニュー紐付けを実装する",
+      "body": "## 概要\n\nスタッフのプロフィール管理と、スタッフ×対応メニューの紐付けを実装します。ここで作る「有効スタッフ+対応メニュー」がM2の空き枠計算の入力になります。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-3. スタッフ管理(admin)」\n- [docs/api.md](../blob/main/docs/api.md) — 「スタッフ(/api/staff)」\n- [docs/database.md](../blob/main/docs/database.md) — staff_profiles、staff_menus\n- [docs/screens.md](../blob/main/docs/screens.md) — A-05\n\n## タスク\n\n- [ ] `GET /api/staff`(active=trueのみ、対応 `menu_ids` 配列を含む)と `GET /api/staff/:id` を実装する\n- [ ] `PATCH /api/staff/:id` を実装する(admin/本人。`active` の変更はadminのみ)\n- [ ] `PUT /api/staff/:id/menus`(admin限定、menu_id配列で全置換)を実装する\n- [ ] 画面A-05(スタッフ一覧、プロフィール編集、対応メニュー設定)を実装する\n- [ ] テスト: 認可(本人以外のstaffによる更新)\n\n## 受入条件\n\n- [ ] adminが対応メニューを設定すると `GET /api/staff` の `menu_ids` に反映される(テストあり)\n- [ ] `active = false` のスタッフが `GET /api/staff` に含まれない(テストあり)\n- [ ] staffが他人のプロフィールを `PATCH` すると `403 FORBIDDEN`、本人は成功する(テストあり)\n- [ ] staffが自分の `active` を変更できない(テストあり)\n\n## ヒント\n\n一覧のN+1(スタッフごとにstaff_menusを引く)に注意してください。JOINまたはIN句でまとめて取得します。\n\n> AIへの依頼例: 「PUT /api/staff/:id/menus を『トランザクション内で全削除→一括INSERT』の全置換で実装し、認可テストを書いてください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M1: 認証と管理基盤"
+    },
+    {
+      "title": "M2-01: 営業時間・定休日の設定を実装する",
+      "body": "## 概要\n\n店舗の営業時間(曜日ごとの開店・閉店・定休日)の参照と、adminによる更新を実装します。空き枠計算(M2-04)の前提データです。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-4. シフト管理(admin / staff本人)」\n- [docs/api.md](../blob/main/docs/api.md) — 「営業時間(/api/business-hours)」\n- [docs/database.md](../blob/main/docs/database.md) — business_hours\n- [docs/screens.md](../blob/main/docs/screens.md) — A-07\n\n## タスク\n\n- [ ] `GET /api/business-hours`(公開)を実装する\n- [ ] `PUT /api/business-hours`(admin限定、7曜日分一括更新)を実装する\n- [ ] バリデーション: `open_time < close_time`、`is_closed = true` の曜日は時刻NULL可\n- [ ] 画面A-07を実装する\n- [ ] テスト: 認可とバリデーション\n\n## 受入条件\n\n- [ ] adminが定休日と営業時間を変更でき、`GET /api/business-hours` に反映される(テストあり)\n- [ ] `open_time >= close_time` の入力が `400 VALIDATION_ERROR` になる(テストあり)\n- [ ] staff・customerによる `PUT` が `403 FORBIDDEN` になる(テストあり)\n\n## ヒント\n\n7行の一括更新はトランザクションで行い、途中失敗で一部だけ更新された状態を残さないようにします。\n\n> AIへの依頼例: 「docs/database.mdのbusiness_hoursのCHECK制約を満たすバリデーションつきで、PUT /api/business-hoursを実装してください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M2: シフトと空き枠"
+    },
+    {
+      "title": "M2-02: シフトパターンの管理を実装する",
+      "body": "## 概要\n\nスタッフの週次シフトパターン(曜日×開始・終了)の管理を実装します。staffは自分の分のみ、adminは全員分を編集できます。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-4. シフト管理(admin / staff本人)」\n- [docs/api.md](../blob/main/docs/api.md) — 「シフト(/api/shifts)」\n- [docs/database.md](../blob/main/docs/database.md) — shift_patterns\n- [docs/screens.md](../blob/main/docs/screens.md) — A-06\n\n## タスク\n\n- [ ] `GET /api/shifts/patterns?staff_id=...` を実装する\n- [ ] `PUT /api/shifts/patterns/:staff_id`(週次パターンの一括置換)を実装する\n- [ ] 認可: staffは自分の `staff_id` のみ、adminは全員分\n- [ ] 画面A-06のパターン編集部分を実装する\n- [ ] テスト: 認可と置換の動作\n\n## 受入条件\n\n- [ ] adminとstaff本人が週次パターンを設定でき、再度PUTすると完全に置き換わる(テストあり)\n- [ ] staffが他人の `staff_id` に対してPUTすると `403 FORBIDDEN` になる(テストあり)\n- [ ] 同一リクエスト内に同じ曜日が2行あると `400 VALIDATION_ERROR` になる(テストあり)\n\n## ヒント\n\n「一括置換」はM1-07の対応メニュー全置換と同じ型(トランザクション内で削除→INSERT)です。\n\n> AIへの依頼例: 「PUT /api/shifts/patterns/:staff_id を一括置換で実装してください。UNIQUE(staff_id, weekday)と整合するリクエストバリデーションも」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M2: シフトと空き枠"
+    },
+    {
+      "title": "M2-03: シフト例外の管理を実装する",
+      "body": "## 概要\n\n特定日のシフト上書き(終日休み `off` / 時間変更 `custom`)を実装します。空き枠計算ではパターンより例外が優先されます。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-4. シフト管理(admin / staff本人)」と用語集「シフト例外」\n- [docs/api.md](../blob/main/docs/api.md) — 「シフト(/api/shifts)」\n- [docs/database.md](../blob/main/docs/database.md) — shift_exceptions\n\n## タスク\n\n- [ ] `GET /api/shifts/exceptions?staff_id=...&from=...&to=...` を実装する\n- [ ] `POST /api/shifts/exceptions` を実装する(`custom` は開始・終了時刻必須)\n- [ ] `DELETE /api/shifts/exceptions/:id` を実装する\n- [ ] 画面A-06に例外の登録・削除を追加する\n- [ ] テスト: バリデーションと一意制約\n\n## 受入条件\n\n- [ ] `off` と `custom` の例外を登録・削除できる(テストあり)\n- [ ] 同一(staff_id, date)への2件目のPOSTが `409` でエラーになる(テストあり)\n- [ ] `custom` で `start_time` を省略すると `400 VALIDATION_ERROR` になる(テストあり)\n- [ ] staffが他人の例外を作成・削除しようとすると `403 FORBIDDEN` になる(テストあり)\n\n## ヒント\n\n`from`/`to` を省略したときのデフォルト(例: 今月)を決めてPRに書いておくと、A-06のカレンダーUIが作りやすくなります。\n\n> AIへの依頼例: 「shift_exceptionsのCHECK制約(type=off or 時刻必須)と対応するAPIバリデーション、409になる重複登録テストを書いてください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M2: シフトと空き枠"
+    },
+    {
+      "title": "M2-04: 空き枠計算APIを実装する",
+      "body": "## 概要\n\nこのプロジェクトの心臓部、`GET /api/availability` を実装します。営業時間∩シフト−既存予約から、メニュー合計所要時間が収まる30分刻みの開始時刻を返します。**テスト観点を先に読み、テストから書くことを推奨します。**\n\n## 仕様参照\n\n- [reservation-domainスキル](../blob/main/.claude/skills/reservation-domain/SKILL.md) — 計算手順(1〜6)とテスト観点(1〜7)。**着手前に必読**\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-5. 空き枠検索」\n- [docs/api.md](../blob/main/docs/api.md) — 「GET /api/availability — 空き枠検索」(JSON例)\n\n## タスク\n\n- [ ] スタッフ・シフト・営業時間・既存予約をそれぞれ1クエリでまとめて取得する(N+1禁止)\n- [ ] 勤務ウィンドウ計算(営業時間∩シフト、例外優先)を実装する\n- [ ] 30分グリッド生成、既存予約(confirmedのみ)の除外、当日+60分ルールを実装する\n- [ ] 指名なし時の複数スタッフのマージ(同時刻をstaff配列に集約)を実装する\n- [ ] reservation-domainスキルの「テスト観点」1〜7をすべてテスト化する\n\n## 受入条件\n\n- [ ] reservation-domainスキルのテスト観点1〜7に対応する自動テストがすべてパスする\n- [ ] 発行クエリ数がスタッフ数・枠数に比例しないことを確認した(クエリログまたはカウントで確認し、PRに記載)\n- [ ] レスポンスがdocs/api.mdのJSON例とキー名・構造まで一致する(slots昇順)\n- [ ] 過去日付の指定が `400 VALIDATION_ERROR`、無効メニュー混入が `422 SLOT_UNAVAILABLE` になる(テストあり)\n\n## ヒント\n\nタイムゾーンが最大の罠です。「dateのJST 0:00」をUTCに変換してから予約を検索し、テストでは現在時刻を固定してください(観点6)。\n\n> AIへの依頼例: 「.claude/skills/reservation-domain/SKILL.mdの『計算手順』を写経するように空き枠計算サービスを実装し、テスト観点1〜7のテストを先に書いてください」\n",
+      "labels": [
+        "feature",
+        "test"
+      ],
+      "milestone": "M2: シフトと空き枠"
+    },
+    {
+      "title": "M2-05: 空き枠検索UIを実装する",
+      "body": "## 概要\n\n予約フローの前半、メニュー選択(C-05)と日時・スタッフ選択(C-06)を実装します。予約確定(C-07以降)はM3-02で作ります。\n\n## 仕様参照\n\n- [docs/screens.md](../blob/main/docs/screens.md) — 「C-05 → C-06 → C-07: 予約フロー(3ステップ)」\n- [docs/api.md](../blob/main/docs/api.md) — 「GET /api/availability — 空き枠検索」\n\n## タスク\n\n- [ ] C-05: メニュー複数選択と、合計所要時間・合計金額の固定バーを実装する\n- [ ] C-06: 日付ピッカー(当日以降のみ)、スタッフ指名(未対応スタッフはグレーアウト)を実装する\n- [ ] C-06: 空き枠グリッドの表示と選択、空きゼロ時の表示を実装する\n- [ ] 日付・スタッフ・メニュー変更時の空き枠再取得を実装する\n\n## 受入条件\n\n- [ ] メニューを2つ選ぶと合計所要時間・金額が正しく表示される(例: カット+トリートメント=90分・8,250円)\n- [ ] 日付やスタッフを変えると空き枠が再取得され、空きゼロの日は「この日は空きがありません」と表示される\n- [ ] 選択メニューに未対応のスタッフが指名候補で選択不可になっている\n- [ ] 選択した枠(start_at、staff)がステップ3へ渡せる形で保持される\n\n## ヒント\n\nステップ間の状態はURLクエリに載せるとリロードやログイン復帰(M3-02)に強くなります。\n\n> AIへの依頼例: 「docs/screens.mdのC-05・C-06の構成要素どおりに、availability APIを使う2画面を実装してください。ステップインジケーター付きで」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M2: シフトと空き枠"
+    },
+    {
+      "title": "M3-01: 予約作成APIを二重予約防止付きで実装する",
+      "body": "## 概要\n\n`POST /api/reservations` を、SELECT FOR UPDATEによる二重予約防止トランザクション付きで実装します。**並行リクエストの競合テストまでがこのissueの範囲です。**\n\n## 仕様参照\n\n- [reservation-domainスキル](../blob/main/.claude/skills/reservation-domain/SKILL.md) — 「2. 二重予約防止」(実装指針と競合テストの書き方)。**着手前に必読**\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-6. 予約(customer)」\n- [docs/api.md](../blob/main/docs/api.md) — 「POST /api/reservations — 予約作成」(処理順序とJSON例)\n- [docs/database.md](../blob/main/docs/database.md) — 「二重予約の防止」、reservations、reservation_menus\n\n## タスク\n\n- [ ] `POST /api/reservations`(customer限定)を実装する\n- [ ] `total_price`・`total_duration_min`・`end_at` をサーバー側で再計算し、reservation_menusへスナップショット保存する\n- [ ] 空き枠ルール検証(営業時間∩シフト、30分グリッド、当日+60分)を実装する → 違反は `422 SLOT_UNAVAILABLE`\n- [ ] トランザクション: staff_profiles行の `SELECT ... FOR UPDATE` → 重複チェック → INSERT を実装する\n- [ ] 競合テスト: 同一枠への並行2リクエスト(スキルの手順どおり)\n\n## 受入条件\n\n- [ ] 同一枠への並行2リクエストで片方が `201`、もう片方が `409 RESERVATION_CONFLICT` になり、confirmed予約がちょうど1件になる(自動テスト)\n- [ ] 部分的に重なる時間帯(10:00-11:00と10:30-11:30)でも片方だけ成立する(テストあり)\n- [ ] 別スタッフへの同時刻の並行予約は両方成功する(テストあり)\n- [ ] リクエストで `total_price` 等を詐称できない(サーバー再計算のテストあり)\n- [ ] グリッド外の開始時刻・当日+60分違反が `422 SLOT_UNAVAILABLE` になる(テストあり)\n\n## ヒント\n\n競合テストは同一DBコネクションだと直列化されて意味がなくなります。コネクション(またはHTTPリクエスト)を分けて並行実行してください。\n\n> AIへの依頼例: 「reservation-domainスキルの『競合テストの書き方』の手順1〜4をこのスタックで実装してください。まずテストを書き、失敗することを確認してからロック処理を実装して」\n",
+      "labels": [
+        "feature",
+        "test"
+      ],
+      "milestone": "M3: 予約コア"
+    },
+    {
+      "title": "M3-02: 予約フローUI(3ステップ)を実装する",
+      "body": "## 概要\n\nM2-05のC-05・C-06に続く、確認(C-07)と完了(C-08)を実装し、予約フローを一周させます。\n\n## 仕様参照\n\n- [docs/screens.md](../blob/main/docs/screens.md) — 「C-05 → C-06 → C-07: 予約フロー(3ステップ)」、customer画面遷移図\n- [docs/api.md](../blob/main/docs/api.md) — 「POST /api/reservations — 予約作成」(エラー例)\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「UC-1: 顧客が予約する」\n\n## タスク\n\n- [ ] C-07: 選択内容サマリ、要望メモ入力、キャンセルポリシー表示、確定ボタンを実装する\n- [ ] 未ログインでC-07に到達した場合のC-04経由の復帰(選択状態の保持)を実装する\n- [ ] `409 RESERVATION_CONFLICT` / `422 SLOT_UNAVAILABLE` のときにメッセージを表示してC-06へ差し戻し、空き枠を再取得する\n- [ ] C-08: 予約完了画面(予約内容とマイページへの導線)を実装する\n\n## 受入条件\n\n- [ ] メニュー選択から予約完了まで画面操作だけで一周できる(手動確認の手順をPRに記載)\n- [ ] 未ログインで確定に進むと、ログイン後に選択状態を保ったまま確認画面へ戻る\n- [ ] 競合エラー時にメッセージ表示とともにC-06へ戻り、最新の空き枠が表示される\n\n## ヒント\n\n競合エラーの動作確認は、別ブラウザ(シークレットウィンドウ)で同じ枠を先に確定すると再現できます。\n\n> AIへの依頼例: 「UC-1の代替フロー3a・4aに対応するエラーハンドリングを、docs/api.mdのcode分岐で実装してください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M3: 予約コア"
+    },
+    {
+      "title": "M3-03: マイページ(予約一覧・詳細)を実装する",
+      "body": "## 概要\n\ncustomerのマイページ(今後の予約・過去の予約・予約詳細・プロフィール編集)を実装します。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-7. マイページ(customer)」\n- [docs/api.md](../blob/main/docs/api.md) — 「予約 — customer(/api/reservations)」\n- [docs/screens.md](../blob/main/docs/screens.md) — C-09、C-10、C-11\n\n## タスク\n\n- [ ] `GET /api/reservations?type=upcoming|past` と `GET /api/reservations/:id`(メニュー内訳含む)を実装する\n- [ ] C-09: 今後の予約(昇順)/過去の予約(降順)のタブ表示を実装する\n- [ ] C-10: 予約詳細(メニュー内訳・金額・担当スタッフ)を実装する\n- [ ] C-11: プロフィール編集(名前・パスワード変更)を実装する\n- [ ] テスト: 他人の予約へのアクセス\n\n## 受入条件\n\n- [ ] upcomingが開始時刻昇順、pastが降順で返る(テストあり)\n- [ ] 他人の予約IDへの `GET /api/reservations/:id` が `404 NOT_FOUND` になる(テストあり)\n- [ ] 名前とパスワードを変更でき、新しいパスワードでログインし直せる(テストあり)\n\n## ヒント\n\nupcoming/pastの境界は「`status = 'confirmed'` かつ `start_at >= now`」がupcomingです(F-7の定義)。statusだけで分けないよう注意してください。\n\n> AIへの依頼例: 「F-7のupcoming/past定義どおりのクエリと、他人の予約が404になる認可テストを書いてください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M3: 予約コア"
+    },
+    {
+      "title": "M3-04: 予約の変更・キャンセル(24時間ルール)を実装する",
+      "body": "## 概要\n\ncustomerによる予約の変更(PATCH)とキャンセル(DELETE)を、開始24時間前ルールと共に実装します。境界値テストが主役のissueです。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-6. 予約(customer)」「UC-2: 顧客がキャンセルする」\n- [docs/api.md](../blob/main/docs/api.md) — 「DELETE /api/reservations/:id — キャンセル」、PATCHの行\n- [docs/database.md](../blob/main/docs/database.md) — 「reservationsのステータス遷移」\n\n## タスク\n\n- [ ] `DELETE /api/reservations/:id` を実装する(`cancelled` 化、`cancelled_at`・`cancel_reason` 記録)\n- [ ] `PATCH /api/reservations/:id` を実装する(start_at / staff_id / menu_ids / customer_note の変更。M3-01のロック処理を共通利用し、自分自身は重複チェックから除外)\n- [ ] 24時間ルール判定を実装する(「24時間前ちょうど」は可)\n- [ ] C-10に変更・キャンセル操作(期限超過時はボタン無効+案内文)を追加する\n- [ ] テスト: 境界値と状態遷移\n\n## 受入条件\n\n- [ ] 開始24時間前ちょうどのキャンセルが成功し、1秒過ぎると `422 CANCEL_DEADLINE_PASSED` になる(時刻固定テスト)\n- [ ] キャンセル後、その時間帯が空き枠検索に再び現れる(テストあり)\n- [ ] `cancelled` 済み予約への再キャンセル・変更が `422 INVALID_STATUS_TRANSITION` になる(テストあり)\n- [ ] 変更時、変更前の自分の時間帯と重なる新時間帯を指定しても `RESERVATION_CONFLICT` にならない(自己除外のテスト)\n\n## ヒント\n\n変更は「キャンセル+新規作成」ではなく同一予約の更新です(idと予約履歴を保つため)。ただし重複チェック・ロックはM3-01と同じコードを通します。\n\n> AIへの依頼例: 「現在時刻を固定できるクロック抽象を導入し、24時間ルールの境界値(ちょうど/1秒後)テストを書いてください」\n",
+      "labels": [
+        "feature",
+        "test"
+      ],
+      "milestone": "M3: 予約コア"
+    },
+    {
+      "title": "M3-05: 予約ボード(日別タイムライン)を実装する",
+      "body": "## 概要\n\nstaff・admin向けの予約ボード(縦=時刻、横=スタッフのタイムライン)と、そのデータを返すAPIを実装します。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-8. 予約ボード(admin / staff)」\n- [docs/api.md](../blob/main/docs/api.md) — 「GET /api/admin/reservations — 予約ボード一覧」(JSON例)\n- [docs/screens.md](../blob/main/docs/screens.md) — 「A-02: 予約ボード」\n\n## タスク\n\n- [ ] `GET /api/admin/reservations?date=YYYY-MM-DD` を実装する(スタッフごとにグループ化、`working_window` 含む)\n- [ ] A-02: 日付ナビゲーション(前日/翌日/ピッカー、初期値は当日)を実装する\n- [ ] A-02: タイムライン描画(勤務ウィンドウ内外の塗り分け、30分刻みの目盛り)を実装する\n- [ ] 予約カード(顧客名・メニュー・ステータス色分け・`created_by = \"admin\"` の識別表示)を実装する\n- [ ] テスト: 認可とworking_window\n\n## 受入条件\n\n- [ ] 指定日の全スタッフの予約がタイムラインで確認できる(cancelledは打ち消し表示)\n- [ ] customerのアクセスが `403 FORBIDDEN`、未ログインが `401` になる(テストあり)\n- [ ] `working_window` が営業時間∩シフト(例外優先)で返り、勤務なしの日は `null` になる(テストあり)\n\n## ヒント\n\n`working_window` の計算はM2-04の勤務ウィンドウ関数をそのまま再利用します。ボード用に再実装しないでください。\n\n> AIへの依頼例: 「docs/api.mdの予約ボード一覧のJSON例と同じ構造のレスポンスを、M2-04の勤務ウィンドウ計算を再利用して実装してください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M3: 予約コア"
+    },
+    {
+      "title": "M3-06: 電話予約の手動登録を実装する",
+      "body": "## 概要\n\nstaff・adminが予約ボードから電話予約を登録できるようにします。既存顧客の選択と、新規顧客の簡易登録の両方に対応します。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-8. 予約ボード(admin / staff)」「UC-3: 店長が電話予約を登録する」\n- [docs/api.md](../blob/main/docs/api.md) — 「POST /api/admin/reservations — 電話予約の手動登録」(JSON例)\n- [docs/screens.md](../blob/main/docs/screens.md) — 「A-03: 予約手動登録」\n\n## タスク\n\n- [ ] `POST /api/admin/reservations` を実装する(`customer_id` または `new_customer`)\n- [ ] 簡易顧客登録(ランダムパスワードのcustomer作成、email重複は `409 EMAIL_TAKEN`)を実装する\n- [ ] 「当日+60分」ルールをこのAPIだけ適用除外にする(その他の枠ルールとロック処理はM3-01と共通)\n- [ ] A-03フォーム(メニュー・スタッフ・枠選択、顧客検索/新規トグル)を実装する\n- [ ] テスト: 両モードの登録とエラー\n\n## 受入条件\n\n- [ ] 既存顧客・新規顧客の両方で登録でき、予約が `created_by = \"admin\"` になる(テストあり)\n- [ ] `new_customer` のemailが既存ユーザーと重複すると `409 EMAIL_TAKEN` になる(テストあり)\n- [ ] customer予約と同じ二重予約防止トランザクションを通っている(手動登録同士の競合テスト、または共通サービスの利用をテストで確認)\n- [ ] 現在時刻+60分以内の直近の枠でも登録できる(テストあり。customer APIとの差分を確認)\n\n## ヒント\n\n顧客検索はM4-01の `GET /api/customers?q=` を先取りして最小実装(メール完全一致など)にしても構いません。その場合はPRに暫定である旨を書きます。\n\n> AIへの依頼例: 「M3-01の予約作成サービスに『60分ルールを適用するか』のフラグを追加し、admin用エンドポイントから共通利用する形にリファクタリングしてください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M3: 予約コア"
+    },
+    {
+      "title": "M3-07: 来店・no_show処理を実装する",
+      "body": "## 概要\n\n予約ボードから予約を `completed`(来店)/ `no_show`(無断キャンセル)/ `cancelled`(店舗都合)へ変更できるようにします。ステータス遷移ルールをAPIで強制します。\n\n## 仕様参照\n\n- [docs/database.md](../blob/main/docs/database.md) — 「reservationsのステータス遷移」(遷移表)\n- [docs/api.md](../blob/main/docs/api.md) — 「予約 — 店舗側(/api/admin/reservations)」PATCHの行\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-8. 予約ボード(admin / staff)」\n\n## タスク\n\n- [ ] `PATCH /api/admin/reservations/:id/status` を実装する(body: `{\"status\": \"completed\" | \"no_show\" | \"cancelled\"}`)\n- [ ] 遷移ルールを実装する(`confirmed` 以外からの遷移、開始時刻前の `completed`/`no_show` を拒否)\n- [ ] A-02の予約カードに操作ボタンを追加する(開始時刻前は `completed`/`no_show` を無効化)\n- [ ] テスト: 遷移マトリクス\n\n## 受入条件\n\n- [ ] 開始時刻を過ぎた `confirmed` 予約を `completed` / `no_show` にできる(テストあり)\n- [ ] 開始時刻前の `completed` 指定が `422 INVALID_STATUS_TRANSITION` になる(テストあり)\n- [ ] `completed` / `cancelled` / `no_show` からの再遷移がすべて `422` になる(テストあり)\n- [ ] staff・adminによる `cancelled` 化は24時間ルールの対象外である(直前の予約でもキャンセルできるテスト)\n\n## ヒント\n\n遷移の可否は「現在status×目標status×ロール×時刻」の表をそのまま関数にすると、テストも表駆動で書けます。\n\n> AIへの依頼例: 「docs/database.mdの遷移表をそのまま表駆動テストにして、全組み合わせを検証してください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M3: 予約コア"
+    },
+    {
+      "title": "M4-01: 顧客一覧とカルテを実装する",
+      "body": "## 概要\n\nstaff・admin向けの顧客検索と、顧客ごとの施術メモ(カルテ)の記録・閲覧を実装します。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「F-9. 顧客管理(admin / staff)」\n- [docs/api.md](../blob/main/docs/api.md) — 「顧客管理(/api/customers)」\n- [docs/database.md](../blob/main/docs/database.md) — customer_notes\n- [docs/screens.md](../blob/main/docs/screens.md) — A-08、A-09\n\n## タスク\n\n- [ ] `GET /api/customers?q=...`(名前・メールの部分一致)と `GET /api/customers/:id` を実装する\n- [ ] `GET /api/customers/:id/notes`(visited_at降順)と `POST /api/customers/:id/notes` を実装する\n- [ ] A-08(検索+一覧)とA-09(予約履歴+カルテの時系列、カルテ追加フォーム)を実装する\n- [ ] M3-06の顧客検索を暫定実装にしていた場合、このAPIに置き換える\n- [ ] テスト: 認可\n\n## 受入条件\n\n- [ ] 名前・メールアドレスの部分一致検索が動く(テストあり)\n- [ ] カルテを記録するとA-09に施術日降順で表示され、記録者が分かる\n- [ ] customerが `/api/customers` 系にアクセスすると `403 FORBIDDEN` になる(テストあり。カルテが顧客本人から見えないことの担保)\n\n## ヒント\n\n検索は `ILIKE '%q%'` で十分です(1店舗の顧客数規模)。ワイルドカード(`%`、`_`)のエスケープだけ忘れずに。\n\n> AIへの依頼例: 「F-9に準拠した顧客検索とカルテAPIを実装し、customerロールが全エンドポイントで403になるテストを書いてください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M4: 運用と仕上げ"
+    },
+    {
+      "title": "M4-02: 売上サマリを実装する",
+      "body": "## 概要\n\nadminが月を指定して、completed予約ベースの売上(月合計・日別)を確認できるようにします。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「4.2 Should」S-2\n- [docs/api.md](../blob/main/docs/api.md) — 「GET /api/admin/summary — 売上サマリ」(JSON例)\n- [docs/screens.md](../blob/main/docs/screens.md) — A-10\n\n## タスク\n\n- [ ] `GET /api/admin/summary?month=YYYY-MM` を実装する(`completed` の `total_price` を `start_at` のJST日付で集計)\n- [ ] `no_show_count` などJSON例のフィールドを揃える\n- [ ] A-10(月ナビゲーション、月合計、日別の表またはグラフ)を実装する\n- [ ] テスト: 集計の正しさとロール\n\n## 受入条件\n\n- [ ] `completed` のみが集計され、`confirmed` / `cancelled` / `no_show` の金額が含まれない(テストあり)\n- [ ] `daily` の合計が `total_sales` と一致する(テストあり)\n- [ ] staffのアクセスが `403 FORBIDDEN` になる(admin専用。テストあり)\n- [ ] 月末深夜(JST 23:30開始)など、UTC変換で日付がずれやすい予約が正しい日・月に集計される(テストあり)\n\n## ヒント\n\n「UTCのstart_atをJSTに変換してから日付切り出し」の順序を間違えると月末・月初の予約がずれます。SQLで集計するかアプリで集計するかを決めてPRに書いてください。\n\n> AIへの依頼例: 「JST基準の日別売上集計SQLを書いてください。UTC保存のTIMESTAMPTZをタイムゾーン変換してから日付でGROUP BYする形で」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M4: 運用と仕上げ"
+    },
+    {
+      "title": "M4-03: リマインダーメールを実装する",
+      "body": "## 概要\n\n毎日18:00(JST)に、翌日の `confirmed` 予約の顧客へリマインダーメールを送ります。スケジュール実行と再実行時の二重送信防止がポイントです。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「4.2 Should」S-1\n- [docs/infra.md](../blob/main/docs/infra.md) — EventBridge Schedulerの行(本番想定)とローカル実装の選択肢\n\n## タスク\n\n- [ ] 翌日(JST)の `confirmed` 予約を抽出してメール送信する処理を、単体実行可能なコマンド/ジョブとして実装する\n- [ ] 毎日18:00 JSTのスケジュール起動を実装する(アプリ内スケジューラ、または手動コマンド+cron設定手順の文書化)\n- [ ] 二重送信防止を設計・実装する(送信済み記録の持ち方はDB設計書にない拡張のため、**設計判断をissueコメントに書いてから**実装する。例: reservationsへの `reminder_sent_at` カラム追加migration)\n- [ ] テスト: 抽出条件と冪等性\n\n## 受入条件\n\n- [ ] コマンドを実行すると、翌日の `confirmed` 予約の顧客にだけMailHogでメールが届く(`cancelled` や翌々日分は届かない。テストあり)\n- [ ] 同じ日に2回実行しても同じ予約に2通届かない(テストあり)\n- [ ] メール本文に予約日時・メニュー・担当スタッフ・キャンセルポリシー(24時間ルール)が含まれる\n\n## ヒント\n\n「翌日」の判定はJSTの日付境界です。M4-02と同じタイムゾーン変換の罠があります。\n\n> AIへの依頼例: 「リマインダー処理を『対象抽出(純粋なクエリ)』と『送信』に分けて実装し、抽出条件のテストを時刻固定で書いてください」\n",
+      "labels": [
+        "feature"
+      ],
+      "milestone": "M4: 運用と仕上げ"
+    },
+    {
+      "title": "M4-04: CI(GitHub Actions)を構築する",
+      "body": "## 概要\n\npush・PRごとにテストとビルドを自動実行するCIをGitHub Actionsで構築します。\n\n## 仕様参照\n\n- [docs/infra.md](../blob/main/docs/infra.md) — 「CI(GitHub Actions)」\n- [docs/development-flow.md](../blob/main/docs/development-flow.md) — Definition of Done\n\n## タスク\n\n- [ ] バックエンドのテストを実行するワークフローを作成する(PostgreSQLはserviceコンテナ)\n- [ ] フロントエンドのビルド(型チェック含む)をワークフローに追加する\n- [ ] 依存関係のキャッシュを設定する\n- [ ] READMEにローカルでCIと同じテストを回すコマンドを記載する(CIバッジは任意)\n\n## 受入条件\n\n- [ ] PRを作成するとCIが自動起動し、テストとビルドが成功する(このissueのPR自身で確認)\n- [ ] テストを意図的に失敗させたコミットでCIが赤になる(確認後にrevertし、確認したことをPRに記載)\n- [ ] M3-01の競合テストを含む全テストがCI上で安定して通る(flakyなら原因を調査して直す)\n\n## ヒント\n\n競合テストがCIでだけ落ちる場合、DBコネクションプールの上限(並行2本が取れているか)を疑ってください。\n\n> AIへの依頼例: 「PostgreSQL 16のserviceコンテナ付きで、このスタックのテストとViteビルドを回すGitHub Actionsワークフローを書いてください」\n",
+      "labels": [
+        "chore",
+        "test"
+      ],
+      "milestone": "M4: 運用と仕上げ"
+    },
+    {
+      "title": "M4-05: READMEとデモを整備する",
+      "body": "## 概要\n\n自分のリポジトリを「初見の人が15分で動かせて、何ができるか分かる」状態に仕上げます。ポートフォリオとしての完成度を決めるissueです。\n\n## 仕様参照\n\n- [docs/development-flow.md](../blob/main/docs/development-flow.md) — 全体の流れ(マイルストーンごとのデモ確認)\n- [docs/screens.md](../blob/main/docs/screens.md) — 画面一覧(スクリーンショット対象の選定に)\n\n## タスク\n\n- [ ] READMEにプロジェクト概要・技術スタック・アーキテクチャ概略を書く\n- [ ] セットアップ手順(clone → compose → migration → seed → 起動 → テスト)を書く\n- [ ] 主要画面のスクリーンショット(予約フロー、予約ボードを含む3枚以上)を貼る\n- [ ] 工夫点(二重予約防止のトランザクション設計、空き枠計算)を自分の言葉で説明する\n- [ ] 既知の制限・未実装項目・発展課題の状況を明記する\n\n## 受入条件\n\n- [ ] READMEの手順だけを見て、まっさらな環境でシードデータ込みでアプリが起動できる(実際に手順どおり再現して確認し、PRに記載)\n- [ ] スクリーンショットが3枚以上あり、予約フローと予約ボードが含まれる\n- [ ] 二重予約防止の仕組みが、コードを読まなくても理解できる説明になっている(面接で話す想定)\n\n## ヒント\n\n「工夫点」はAIに書かせた文章をそのまま貼らないでください。面接で深掘りされたときに自分の言葉で説明できる内容だけを書きます。\n\n> AIへの依頼例: 「私が書いた工夫点の下書きをレビューして、技術的に不正確な箇所と、面接で突っ込まれそうな箇所を指摘してください」\n",
+      "labels": [
+        "docs"
+      ],
+      "milestone": "M4: 運用と仕上げ"
+    },
+    {
+      "title": "ADV-01: Stripeテスト決済を組み込む",
+      "body": "## 概要\n\n【発展課題・任意】予約確定時にStripe(テストモード)で事前決済を行います。外部決済とDBトランザクションの整合という、実務で頻出の設計問題に取り組みます。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「4.3 Could」A-1\n- [reservation-domainスキル](../blob/main/.claude/skills/reservation-domain/SKILL.md) — 二重予約防止(決済との順序を崩さないこと)\n\n## タスク\n\n- [ ] Stripeテストアカウントを作成し、PaymentIntentまたはCheckout Sessionを組み込む\n- [ ] 「決済成功時のみ予約確定」の設計(決済とSELECT FOR UPDATEトランザクションの順序、決済成功後に枠が取られていた場合の扱い)を**実装前にissueコメントに書く**\n- [ ] キャンセル時の返金方針(24時間ルールとの関係)を決めて実装する\n- [ ] テストカードでのE2E動作確認とテストコード\n\n## 受入条件\n\n- [ ] テストカード(4242 4242 4242 4242)で決済付き予約が確定する\n- [ ] 決済失敗時に予約が作成されず、枠が空きのまま残る(テストあり)\n- [ ] 設計判断(決済とロックの順序、失敗時の補償処理、返金ポリシー)がissueコメントとPRに記録されている\n\n## ヒント\n\n「決済してからロックを取る」と決済済みなのに枠がない事態が起こり、「ロック中に決済する」とロック保持時間が伸びます。このトレードオフを言語化することが課題の本体です。\n\n> AIへの依頼例: 「予約確定と決済の整合パターン(仮押さえ+期限、決済後補償、ロック内決済)を比較して、このシステムの制約での推奨と理由を説明してください」\n",
+      "labels": [
+        "advanced",
+        "feature"
+      ],
+      "milestone": null
+    },
+    {
+      "title": "ADV-02: 複数店舗対応の設計ドキュメントを書く",
+      "body": "## 概要\n\n【発展課題・任意】Luminaが2店舗目を出す想定で、現行の全テーブル・API・画面を複数店舗対応させる**設計ドキュメント**を書きます(実装は任意)。\n\n## 仕様参照\n\n- [docs/database.md](../blob/main/docs/database.md) — 全テーブル(影響分析の対象)\n- [docs/api.md](../blob/main/docs/api.md) — エンドポイント一覧(URL設計変更の対象)\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「4.3 Could」A-2、「7. スコープ外」\n\n## タスク\n\n- [ ] `stores` テーブルを導入した場合の全12テーブルへの影響(FK追加の要否、変更が必要なUNIQUE制約)を表で整理する\n- [ ] API・URL設計の変更案を書く(例: `/api/stores/:id/availability` へのネスト vs クエリパラメータ)\n- [ ] 画面・権限の変更案(店舗別スタッフ、店舗横断のadmin、顧客から見た店舗選択)を書く\n- [ ] 既存データの移行手順(全データをLumière店に帰属させるmigration)を書く\n- [ ] 成果物を自分のリポジトリの `docs/multi-store-design.md` にまとめる\n\n## 受入条件\n\n- [ ] UNIQUE制約の変更が必要な箇所(例: `business_hours.weekday` → `(store_id, weekday)`、`shift_patterns(staff_id, weekday)` の扱い)がすべて列挙されている\n- [ ] 空き枠計算・二重予約防止への影響(ロックの粒度は店舗×スタッフでどう変わるか)が考察されている\n- [ ] 移行手順に「ダウンタイムの有無」と「ロールバック方法」が書かれている\n\n## ヒント\n\n「全テーブルにstore_idを付ける」は思考停止です。usersは店舗横断(顧客は両店舗を使える)では?と、1テーブルずつ問い直してください。\n\n> AIへの依頼例: 「この12テーブルに複数店舗対応を適用するとき、店舗スコープにすべきテーブルとグローバルにすべきテーブルを分類し、理由を付けてください。私が反論するので議論しましょう」\n",
+      "labels": [
+        "advanced",
+        "docs"
+      ],
+      "milestone": null
+    },
+    {
+      "title": "ADV-03: 待ちリストを実装する",
+      "body": "## 概要\n\n【発展課題・任意】満枠の日時に顧客が待ちリスト登録し、キャンセル発生時にメールで通知される機能を作ります。テーブル設計から自分で行う、詳細仕様のない課題です。\n\n## 仕様参照\n\n- [docs/requirements.md](../blob/main/docs/requirements.md) — 「4.3 Could」A-3\n- [reservation-domainスキル](../blob/main/.claude/skills/reservation-domain/SKILL.md) — 通知後の予約でも二重予約防止が保たれること\n\n## タスク\n\n- [ ] 待ちリストのテーブルとAPIを設計し、**実装前にissueコメントに設計を書く**(対象の粒度: 日付だけか、時間帯+スタッフか。通知は先頭1名か全員か)\n- [ ] 待ちリスト登録のAPI・UI(C-06で空きゼロのときの導線)を実装する\n- [ ] キャンセル処理(customerのDELETE、staff・adminのstatus変更)にフックして通知メールを送る\n- [ ] テスト: 通知条件と競合\n\n## 受入条件\n\n- [ ] 空き枠ゼロの条件で待ちリストに登録でき、該当時間帯のキャンセル発生時にメールが届く(テストあり)\n- [ ] 通知を受けても予約は早い者勝ちで、通常の二重予約防止がそのまま機能する(通知後の競合テスト)\n- [ ] 成立済み・期限切れの待ちリストが放置されない(クリーンアップの仕様を自分で決めてテスト)\n\n## ヒント\n\n「通知した人に枠を仮押さえする」仕様にすると一気に難しくなります(仮押さえの期限管理)。まずは「通知だけ・早い者勝ち」で完成させるのがおすすめです。\n\n> AIへの依頼例: 「待ちリストのテーブル設計を2案(日付粒度/枠粒度)出して、通知の空振り率と実装コストの観点で比較してください」\n",
+      "labels": [
+        "advanced",
+        "feature"
+      ],
+      "milestone": null
+    }
+  ]
+}
