@@ -24,23 +24,26 @@
 ## このリポジトリの使い方
 
 前提: [GitHub CLI(gh)](https://cli.github.com/) と jq、Docker、Node.js(または選択スタックのランタイム)。
+gh と jq が未導入の場合、macOSは `brew install gh jq`、Windowsは `winget install GitHub.cli jqlang.jq`(またはWSLで `sudo apt install gh jq`)で入ります。初回は `gh auth login`(GitHub.com / HTTPS / ブラウザ認証でOK)を済ませてください。
 
 1. **テンプレートから自分のリポジトリを作る**
-   このページ右上の「Use this template」→「Create a new repository」で、自分のアカウントにリポジトリを作ります(publicにするとポートフォリオとして共有しやすいです)。
+   このページ右上の「Use this template」→「Create a new repository」で、自分のアカウントにリポジトリを作ります(リポジトリ名は自由です。例: `lumina-reserve`)。publicにするとポートフォリオとして共有しやすいです。
 2. **cloneしてghの認証を確認する**
    ```bash
    git clone https://github.com/<あなたのアカウント>/<リポジトリ名>.git
    cd <リポジトリ名>
    gh auth status || gh auth login
    ```
-3. **issueを複製する**
+3. **Claude Codeを起動してオンボーディングする**
+   リポジトリ直下で `claude` を起動し、`.claude/skills/project-onboarding` スキルを読ませます。プロジェクトの全体像とdocsの読み順を押さえてから始めると立ち上がりがスムーズです。
+4. **issueを複製する**
    Claude Codeで `.claude/skills/setup-github-project` スキルの手順に従うか、直接実行します。
    ```bash
    ./scripts/setup_issues.sh
    ```
    label 5種、milestone 4件、issue 27件(必須24+発展3)が自分のリポジトリに作成されます。
-4. **M1のissueから開始する**
-   進め方の全体像は [docs/development-flow.md](./docs/development-flow.md) を読んでください。Claude Codeを使う場合は、最初に `.claude/skills/project-onboarding` スキルを読ませると立ち上がりがスムーズです。
+5. **M1-01のissueから開始する**
+   進め方の全体像は [docs/development-flow.md](./docs/development-flow.md) を読んでください。
 
 ## ドキュメント一覧
 

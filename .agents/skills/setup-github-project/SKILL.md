@@ -57,6 +57,7 @@ gh api repos/{owner}/{repo}/milestones -q '.[].title'  # M1〜M4があるか
 ```
 
 GitHub上でM1のissueを開き、本文の「仕様参照」リンクが自分のリポジトリのdocsに繋がることを確認したら、`M1-01` から開発を開始します(`issue-workflow` スキル参照)。
+なお、issue本文の仕様参照リンクは相対リンク(`../blob/main/...`)なので、GitHubの**Web画面**で開いて確認してください(ターミナルの `gh issue view` では相対リンクは辿れません)。
 
 ## よくあるトラブル
 
