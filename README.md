@@ -56,6 +56,7 @@ gh と jq が未導入の場合、macOSは `brew install gh jq`、Windowsは `wi
 | [docs/api.md](./docs/api.md) | API設計書。全エンドポイント、認証方式(Cookie + JWT)、エラーコード、主要APIのJSON例 |
 | [docs/screens.md](./docs/screens.md) | 画面定義書。画面一覧(C-xx / A-xx)、予約フロー・予約ボードの構成、画面遷移図 |
 | [docs/infra.md](./docs/infra.md) | インフラ設計書。docker compose構成、本番想定AWS構成図、コスト注意 |
+| [docs/tips.md](./docs/tips.md) | 環境つまずき集。pnpm・Prisma・Docker・React StrictModeなど環境起因のエラーはまずここを確認 |
 | [docs/development-flow.md](./docs/development-flow.md) | 開発の進め方。issue駆動、ブランチ規約、Definition of Done、セルフレビュー観点 |
 
 ## 推奨スタック

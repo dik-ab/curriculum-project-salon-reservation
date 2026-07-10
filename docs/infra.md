@@ -6,6 +6,21 @@
 
 ミドルウェア(PostgreSQL、メールキャッチャー)はdocker composeで起動し、APIとフロントはホストマシンで直接実行する構成を推奨します(ホットリロードが素直に効くため)。APIやフロントもコンテナ化して構いません。
 
+### ディレクトリ構成の例
+
+APIとフロントはリポジトリルート直下の `api/` と `web/` に置き、`docker-compose.yml` はルートに置く構成を推奨します(以後のドキュメント・issueはこの配置を前提に書きます)。
+
+```text
+<リポジトリルート>
+├── docker-compose.yml
+├── .env                # compose用(POSTGRES_PORT など)
+├── api/                # バックエンド(選択したスタック)
+│   └── .env
+├── web/                # フロントエンド(React + Vite + TypeScript)
+│   └── .env
+└── docs/               # 仕様書(テンプレート由来。そのまま残す)
+```
+
 ```yaml
 # docker-compose.yml の例
 services:
@@ -16,11 +31,12 @@ services:
       POSTGRES_PASSWORD: lumina
       POSTGRES_DB: lumina_reserve
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
   mailhog:
     image: mailhog/mailhog:v1.0.1
+    platform: linux/amd64   # Apple Silicon(arm64)ではこの指定が必要(arm64イメージが無いため)。代替としてMailpit(axllent/mailpit)も可
     ports:
       - "1025:1025"   # SMTP(アプリからの送信先)
       - "8025:8025"   # Web UI(受信メールの確認)
@@ -35,8 +51,24 @@ volumes:
 | API | ホスト(コンテナも可) | 3000など | 選択したスタックの開発サーバー |
 | フロント(React + Vite) | ホスト | 5173 | `VITE_API_URL` でAPIのURLを指定し、CORS + Cookieで接続 |
 
+- 上表の「ポート例」はコンテナ側・既定値を規範とします。ホスト側のポートが既に使われている場合は、環境変数(`POSTGRES_PORT` など)でホスト側だけ変更して構いません(その場合は接続文字列も合わせます)。
 - アプリからのメール送信はSMTP(`localhost:1025`)に向けます。本番だけSESに切り替えられるよう、メール送信は1モジュールに集約してください。
-- 環境変数は `.env.example` をリポジトリに置き、`.env` はgitignoreします(DB接続文字列、JWTシークレット、SMTPホストなど)。
+- 環境変数は `.env.example` をリポジトリに置き、`.env` はgitignoreします。
+
+### 環境変数の正準一覧
+
+環境変数の置き場所と名前は次に統一します(issue・docsはこの名前を前提とします)。
+
+| ファイル | 変数 | 用途 |
+|---|---|---|
+| ルート `.env` | `POSTGRES_PORT` | composeがホスト側に公開するPostgreSQLポート(既定 5432) |
+| `api/.env` | `DATABASE_URL` | PostgreSQL接続文字列 |
+| `api/.env` | `JWT_SECRET` | JWT署名シークレット |
+| `api/.env` | `SMTP_HOST` / `SMTP_PORT` | メール送信先(開発では `localhost` / `1025`) |
+| `api/.env` | `FRONTEND_ORIGIN` | CORSで許可するフロントのorigin(例: `http://localhost:5173`) |
+| `api/.env` | `PORT` | APIのリッスンポート(例: 3000) |
+| `api/.env` | `SEED_ADMIN_PASSWORD` | シードの初期adminパスワード([DB設計書 - シードデータ](./database.md#シードデータ)) |
+| `web/.env` | `VITE_API_URL` | APIのベースURL(例: `http://localhost:3000`) |
 
 ## 本番想定のAWS構成
 

@@ -5,6 +5,7 @@ PostgreSQLを前提としたデータベース設計書です。型はPostgreSQL
 - 主キーはすべて `BIGSERIAL`(自動採番)です。ただし `staff_profiles` はusersと1対1のため `user_id` を主キーに、中間テーブル(`staff_menus`、`reservation_menus`)は複合主キーにします。
 - 日時は `TIMESTAMPTZ`(UTC保存)、営業時間・シフトの時刻は `TIME`(JSTの壁時計時刻)、日付は `DATE` を使います。
 - 文字列ステータス(`role`、`status`、`type` など)はCHECK制約付きの `VARCHAR` とします(ネイティブENUMでも構いませんが、値は本書と完全一致させること)。
+- DB制約として実装するのは、本書で「CHECK」と明記した項目のみです。それ以外の整合ルール(例: `status = 'cancelled'` のとき `cancelled_at` 必須)はアプリケーション層のバリデーションで担保します。
 
 ## ER図
 
@@ -243,6 +244,8 @@ adminが発行するstaff・admin登録用の招待です。
 
 CHECK制約: `is_closed OR (open_time IS NOT NULL AND close_time IS NOT NULL)`
 
+なお `open_time < close_time` のCHECKは、時刻がNULLの行では評価結果がNULLとなり違反になりません(SQLの三値論理)。そのため定休日の行(`is_closed = true`・時刻NULL)はこのCHECKと共存できます。
+
 ### shift_patterns
 
 スタッフの週次シフトパターンです。行がない曜日は勤務なしです。
@@ -391,8 +394,47 @@ stateDiagram-v2
 
 ## シードデータ
 
-M1-02(スキーマ初期化)で、最低限次のシードを投入してください。
+M1-02(スキーマ初期化)で次のシードを投入してください。シードは**upsertで冪等**に実装します(何度実行しても同じ状態になり、2回目の実行でUNIQUE違反にならないこと)。
 
-- 初期adminユーザー1名(例: `admin@lumina.example`)。招待発行の起点になるため必須です。パスワードは環境変数またはシードスクリプト内の固定値とし、READMEに記載します。
-- business_hoursの7行(火〜金 10:00〜19:00、土日 09:00〜18:00、月曜 `is_closed = true`)。
-- 動作確認用のメニュー5件(カット60分4,950円、カラー90分8,800円、パーマ120分11,000円、トリートメント30分3,300円、ヘッドスパ30分3,850円)を推奨します。
+### users(3名)
+
+| role | name | email | パスワード | email_verified_at |
+|---|---|---|---|---|
+| admin | 管理者 | `admin@lumina.example` | 環境変数 `SEED_ADMIN_PASSWORD`(未設定時の固定値例: `admin-dev-password`) | 登録時刻(シード実行時刻) |
+| customer | customer1 | `customer@lumina.example` | 固定値例: `customer-dev-password` | 登録時刻(確認済みとして投入) |
+| staff | staff1 | `staff@lumina.example` | 固定値例: `staff-dev-password` | 登録時刻 |
+
+- adminは招待発行の起点になるため必須です。customer1・staff1は予約フローやロール別アクセスの動作確認用です。
+- パスワードはbcrypt等でハッシュ化して保存し、値の一覧をREADMEに記載します。
+
+### staff_profiles(staff1の1行)
+
+| user_id | display_name | bio | image_url | active |
+|---|---|---|---|---|
+| staff1のusers.id | AOI | `''` | NULL | true |
+
+### staff_menus
+
+staff1に**シードのメニュー5件すべて**を紐付けます(下表の5件 × staff1の5行)。これでシード投入直後から空き枠検索・予約の動作確認ができます(シフトはM2で設定します)。
+
+### business_hours(7行)
+
+| weekday | 曜日 | open_time | close_time | is_closed |
+|---|---|---|---|---|
+| 0 | 日 | 09:00 | 18:00 | false |
+| 1 | 月 | NULL | NULL | true |
+| 2 | 火 | 10:00 | 19:00 | false |
+| 3 | 水 | 10:00 | 19:00 | false |
+| 4 | 木 | 10:00 | 19:00 | false |
+| 5 | 金 | 10:00 | 19:00 | false |
+| 6 | 土 | 09:00 | 18:00 | false |
+
+### menus(5件)
+
+| name | description | duration_min | price | active | sort_order |
+|---|---|---|---|---|---|
+| カット | シャンプー・ブロー込み | 60 | 4950 | true | 1 |
+| カラー | リタッチ〜フルカラー | 90 | 8800 | true | 2 |
+| パーマ | デジタルパーマ含む | 120 | 11000 | true | 3 |
+| トリートメント | 集中補修トリートメント | 30 | 3300 | true | 4 |
+| ヘッドスパ | 炭酸ヘッドスパ | 30 | 3850 | true | 5 |
